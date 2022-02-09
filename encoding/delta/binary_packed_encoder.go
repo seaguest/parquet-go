@@ -3,6 +3,7 @@ package delta
 import (
 	"encoding/binary"
 	"io"
+	"unsafe"
 
 	"github.com/segmentio/parquet-go/encoding"
 	"github.com/segmentio/parquet-go/internal/bits"
@@ -93,15 +94,13 @@ func (e *BinaryPackedEncoder) EncodeInt32(data []int32) error {
 			if bitWidth != 0 {
 				j := (i + 0) * miniBlockSize32
 				k := (i + 1) * miniBlockSize32
+				b := blockToInt32x8(block[j:k])
+				n := uint(bitWidth)
 
-				for _, bits := range block[j:k] {
-					e.miniBlock.WriteBits(uint64(bits), uint(bitWidth))
+				if err := e.miniBlock.WriteInt32x8(b, n); err != nil {
+					return err
 				}
 			}
-		}
-
-		if err := e.miniBlock.Flush(); err != nil {
-			return err
 		}
 	}
 
@@ -156,15 +155,13 @@ func (e *BinaryPackedEncoder) EncodeInt64(data []int64) error {
 			if bitWidth != 0 {
 				j := (i + 0) * miniBlockSize64
 				k := (i + 1) * miniBlockSize64
+				b := blockToInt64x8(block[j:k])
+				n := uint(bitWidth)
 
-				for _, bits := range block[j:k] {
-					e.miniBlock.WriteBits(uint64(bits), uint(bitWidth))
+				if err := e.miniBlock.WriteInt64x8(b, n); err != nil {
+					return err
 				}
 			}
-		}
-
-		if err := e.miniBlock.Flush(); err != nil {
-			return err
 		}
 	}
 
@@ -190,4 +187,12 @@ func (e *BinaryPackedEncoder) encodeBlock(minDelta int64, bitWidths []byte) erro
 	}
 	_, err := e.writer.Write(bitWidths)
 	return err
+}
+
+func blockToInt32x8(block []int32) [][8]int32 {
+	return unsafe.Slice(*(**[8]int32)(unsafe.Pointer(&block)), len(block)/8)
+}
+
+func blockToInt64x8(block []int64) [][8]int64 {
+	return unsafe.Slice(*(**[8]int64)(unsafe.Pointer(&block)), len(block)/8)
 }

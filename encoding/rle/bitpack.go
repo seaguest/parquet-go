@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	. "math/bits"
+	"unsafe"
 
 	"github.com/segmentio/parquet-go/internal/bits"
 )
@@ -146,40 +147,30 @@ func (e *bitPackRunEncoder) encode(src []byte, srcWidth uint) error {
 
 	switch srcWidth {
 	case 8:
-		e.encodeInt8(bits.BytesToInt8(src), e.bitWidth)
+		return e.writer.WriteInt8x8(bytesToInt8x8(src), e.bitWidth)
 	case 16:
-		e.encodeInt16(bits.BytesToInt16(src), e.bitWidth)
+		return e.writer.WriteInt16x8(bytesToInt16x8(src), e.bitWidth)
 	case 32:
-		e.encodeInt32(bits.BytesToInt32(src), e.bitWidth)
+		return e.writer.WriteInt32x8(bytesToInt32x8(src), e.bitWidth)
 	case 64:
-		e.encodeInt64(bits.BytesToInt64(src), e.bitWidth)
+		return e.writer.WriteInt64x8(bytesToInt64x8(src), e.bitWidth)
 	default:
 		panic("BUG: unsupported source bit-width")
 	}
-
-	return e.writer.Flush()
 }
 
-func (e *bitPackRunEncoder) encodeInt8(src []int8, bitWidth uint) {
-	for _, v := range src {
-		e.writer.WriteBits(uint64(v), bitWidth)
-	}
+func bytesToInt8x8(data []byte) [][8]int8 {
+	return unsafe.Slice(*(**[8]int8)(unsafe.Pointer(&data)), len(data)/8)
 }
 
-func (e *bitPackRunEncoder) encodeInt16(src []int16, bitWidth uint) {
-	for _, v := range src {
-		e.writer.WriteBits(uint64(v), bitWidth)
-	}
+func bytesToInt16x8(data []byte) [][8]int16 {
+	return unsafe.Slice(*(**[8]int16)(unsafe.Pointer(&data)), len(data)/16)
 }
 
-func (e *bitPackRunEncoder) encodeInt32(src []int32, bitWidth uint) {
-	for _, v := range src {
-		e.writer.WriteBits(uint64(v), bitWidth)
-	}
+func bytesToInt32x8(data []byte) [][8]int32 {
+	return unsafe.Slice(*(**[8]int32)(unsafe.Pointer(&data)), len(data)/32)
 }
 
-func (e *bitPackRunEncoder) encodeInt64(src []int64, bitWidth uint) {
-	for _, v := range src {
-		e.writer.WriteBits(uint64(v), bitWidth)
-	}
+func bytesToInt64x8(data []byte) [][8]int64 {
+	return unsafe.Slice(*(**[8]int64)(unsafe.Pointer(&data)), len(data)/64)
 }
