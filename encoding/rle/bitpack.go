@@ -145,18 +145,23 @@ func (e *bitPackRunEncoder) encode(src []byte, srcWidth uint) error {
 			srcWidth, e.bitWidth)
 	}
 
+	var err error
 	switch srcWidth {
 	case 8:
-		return e.writer.WriteInt8x8(bytesToInt8x8(src), e.bitWidth)
+		err = e.writer.WriteInt8x8(bytesToInt8x8(src), e.bitWidth)
 	case 16:
-		return e.writer.WriteInt16x8(bytesToInt16x8(src), e.bitWidth)
+		err = e.writer.WriteInt16x8(bytesToInt16x8(src), e.bitWidth)
 	case 32:
-		return e.writer.WriteInt32x8(bytesToInt32x8(src), e.bitWidth)
+		err = e.writer.WriteInt32x8(bytesToInt32x8(src), e.bitWidth)
 	case 64:
-		return e.writer.WriteInt64x8(bytesToInt64x8(src), e.bitWidth)
+		err = e.writer.WriteInt64x8(bytesToInt64x8(src), e.bitWidth)
 	default:
 		panic("BUG: unsupported source bit-width")
 	}
+	if err != nil {
+		return fmt.Errorf("BIT_PACK encoding %d bits values to %d bits: %w", srcWidth, e.bitWidth, err)
+	}
+	return nil
 }
 
 func bytesToInt8x8(data []byte) [][8]int8 {

@@ -117,96 +117,7 @@ func forEachBenchmarkBufferSize(b *testing.B, f func(*testing.B, int)) {
 // API and tests arrays of larger sizes than the maximum of 50 hardcoded in
 // testing/quick.
 func quickCheck(f interface{}) error {
-	v := reflect.ValueOf(f)
-	r := rand.New(rand.NewSource(0))
-
-	var makeArray func(int) interface{}
-	switch t := v.Type().In(0); t.Elem().Kind() {
-	case reflect.Bool:
-		makeArray = func(n int) interface{} {
-			v := make([]bool, n)
-			for i := range v {
-				v[i] = r.Int()%2 != 0
-			}
-			return v
-		}
-
-	case reflect.Int32:
-		makeArray = func(n int) interface{} {
-			v := make([]int32, n)
-			for i := range v {
-				v[i] = r.Int31()
-			}
-			return v
-		}
-
-	case reflect.Int64:
-		makeArray = func(n int) interface{} {
-			v := make([]int64, n)
-			for i := range v {
-				v[i] = r.Int63()
-			}
-			return v
-		}
-
-	case reflect.Uint32:
-		makeArray = func(n int) interface{} {
-			v := make([]uint32, n)
-			for i := range v {
-				v[i] = r.Uint32()
-			}
-			return v
-		}
-	case reflect.Uint64:
-		makeArray = func(n int) interface{} {
-			v := make([]uint64, n)
-			for i := range v {
-				v[i] = r.Uint64()
-			}
-			return v
-		}
-
-	case reflect.Float32:
-		makeArray = func(n int) interface{} {
-			v := make([]float32, n)
-			for i := range v {
-				v[i] = r.Float32()
-			}
-			return v
-		}
-
-	case reflect.Float64:
-		makeArray = func(n int) interface{} {
-			v := make([]float64, n)
-			for i := range v {
-				v[i] = r.Float64()
-			}
-			return v
-		}
-
-	case reflect.Uint8:
-		makeArray = func(n int) interface{} {
-			v := make([]byte, n)
-			r.Read(v)
-			return v
-		}
-
-	case reflect.Array:
-		e := t.Elem()
-		if e.Elem().Kind() == reflect.Uint8 && e.Len() == 16 {
-			makeArray = func(n int) interface{} {
-				v := make([]byte, n*16)
-				r.Read(v)
-				return bits.BytesToUint128(v)
-			}
-		}
-	}
-
-	if makeArray == nil {
-		panic("cannot run quick check on function with input of type " + v.Type().In(0).String())
-	}
-
-	for _, n := range [...]int{
+	return sizes{
 		0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
 		10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
 		20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
@@ -217,14 +128,122 @@ func quickCheck(f interface{}) error {
 		1000, 1023, 1024, 1025,
 		2000, 2095, 2048, 2049,
 		4000, 4095, 4096, 4097,
-	} {
-		for i := 0; i < 3; i++ {
-			in := makeArray(n)
-			ok := v.Call([]reflect.Value{reflect.ValueOf(in)})
-			if !ok[0].Bool() {
-				return fmt.Errorf("test #%d: failed on input of size %d: %#v\n", i+1, n, in)
+	}.quickCheck(f)
+}
+
+type sizes []int
+
+func (sizes sizes) quickCheck(f interface{}) error {
+	makeArray := makeArrayFuncOf(reflect.TypeOf(f).In(0))
+	v := reflect.ValueOf(f)
+	r := rand.New(rand.NewSource(0))
+
+	for _, n := range sizes {
+		in := makeArray(r, n)
+		rv := v.Call([]reflect.Value{in})
+		switch ret := rv[0].Interface().(type) {
+		case bool:
+			if !ret {
+				return fmt.Errorf("failed on input of size %d: %#v\n", n, in)
 			}
+		case error:
+			if ret != nil {
+				return fmt.Errorf("failed on input of size %d: %v\n", n, ret)
+			}
+		case nil:
+			// OK!
+		default:
+			panic(fmt.Sprintf("quick check function returned value of unsupported type: %T", ret))
 		}
 	}
+
 	return nil
+}
+
+func makeArrayFuncOf(t reflect.Type) func(*rand.Rand, int) reflect.Value {
+	var makeArray func(*rand.Rand, int) reflect.Value
+
+	switch t.Kind() {
+	case reflect.Bool:
+		makeArray = func(r *rand.Rand, _ int) reflect.Value {
+			return reflect.ValueOf(r.Int()%3 != 0)
+		}
+
+	case reflect.Int8:
+		makeArray = func(r *rand.Rand, _ int) reflect.Value {
+			return reflect.ValueOf(int8(r.Uint32() & 0x7F))
+		}
+
+	case reflect.Int16:
+		makeArray = func(r *rand.Rand, _ int) reflect.Value {
+			return reflect.ValueOf(int16(r.Uint32() & 0x7FFF))
+		}
+
+	case reflect.Int32:
+		makeArray = func(r *rand.Rand, _ int) reflect.Value {
+			return reflect.ValueOf(r.Int31())
+		}
+
+	case reflect.Int64:
+		makeArray = func(r *rand.Rand, _ int) reflect.Value {
+			return reflect.ValueOf(r.Int63())
+		}
+
+	case reflect.Uint8:
+		makeArray = func(r *rand.Rand, _ int) reflect.Value {
+			return reflect.ValueOf(uint8(r.Uint32()))
+		}
+
+	case reflect.Uint16:
+		makeArray = func(r *rand.Rand, _ int) reflect.Value {
+			return reflect.ValueOf(uint16(r.Uint32()))
+		}
+
+	case reflect.Uint32:
+		makeArray = func(r *rand.Rand, _ int) reflect.Value {
+			return reflect.ValueOf(r.Uint32())
+		}
+
+	case reflect.Uint64:
+		makeArray = func(r *rand.Rand, _ int) reflect.Value {
+			return reflect.ValueOf(r.Uint64())
+		}
+
+	case reflect.Float32:
+		makeArray = func(r *rand.Rand, _ int) reflect.Value {
+			return reflect.ValueOf(r.Float32())
+		}
+
+	case reflect.Float64:
+		makeArray = func(r *rand.Rand, _ int) reflect.Value {
+			return reflect.ValueOf(r.Float64())
+		}
+
+	case reflect.Array:
+		f := makeArrayFuncOf(t.Elem())
+		n := t.Len()
+		makeArray = func(r *rand.Rand, _ int) reflect.Value {
+			v := reflect.New(t).Elem()
+			for i := 0; i < n; i++ {
+				v.Index(i).Set(f(r, 0))
+			}
+			return v
+		}
+
+	case reflect.Slice:
+		f := makeArrayFuncOf(t.Elem())
+		makeArray = func(r *rand.Rand, n int) reflect.Value {
+			v := reflect.MakeSlice(t, n, n)
+			for i := 0; i < n; i++ {
+				v.Index(i).Set(f(r, 0))
+			}
+			return v
+		}
+	}
+
+	if makeArray == nil {
+		panic("cannot run quick check on function with input of type " + t.String())
+	}
+
+	return makeArray
 }

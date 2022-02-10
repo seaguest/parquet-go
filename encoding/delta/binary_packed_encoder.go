@@ -2,6 +2,7 @@ package delta
 
 import (
 	"encoding/binary"
+	"fmt"
 	"io"
 	"unsafe"
 
@@ -53,7 +54,7 @@ func (e *BinaryPackedEncoder) EncodeInt32(data []int32) error {
 	}
 
 	if err := e.encodeHeader(blockSize32, numMiniBlock32, len(data), int64(firstValue)); err != nil {
-		return err
+		return e.errorf("encoding header of INT32", err)
 	}
 
 	if len(data) <= 1 {
@@ -87,7 +88,7 @@ func (e *BinaryPackedEncoder) EncodeInt32(data []int32) error {
 		}
 
 		if err := e.encodeBlock(int64(minDelta), bitWidths); err != nil {
-			return err
+			return e.errorf("encoding block of INT32", err)
 		}
 
 		for i, bitWidth := range bitWidths {
@@ -98,7 +99,7 @@ func (e *BinaryPackedEncoder) EncodeInt32(data []int32) error {
 				n := uint(bitWidth)
 
 				if err := e.miniBlock.WriteInt32x8(b, n); err != nil {
-					return err
+					return e.errorf("writing block of INT32", err)
 				}
 			}
 		}
@@ -114,7 +115,7 @@ func (e *BinaryPackedEncoder) EncodeInt64(data []int64) error {
 	}
 
 	if err := e.encodeHeader(blockSize64, numMiniBlock64, len(data), firstValue); err != nil {
-		return err
+		return e.errorf("encoding header of INT64", err)
 	}
 
 	if len(data) <= 1 {
@@ -148,7 +149,7 @@ func (e *BinaryPackedEncoder) EncodeInt64(data []int64) error {
 		}
 
 		if err := e.encodeBlock(minDelta, bitWidths); err != nil {
-			return err
+			return e.errorf("encoding block of INT64", err)
 		}
 
 		for i, bitWidth := range bitWidths {
@@ -159,7 +160,7 @@ func (e *BinaryPackedEncoder) EncodeInt64(data []int64) error {
 				n := uint(bitWidth)
 
 				if err := e.miniBlock.WriteInt64x8(b, n); err != nil {
-					return err
+					return e.errorf("writing block of INT64", err)
 				}
 			}
 		}
@@ -187,6 +188,10 @@ func (e *BinaryPackedEncoder) encodeBlock(minDelta int64, bitWidths []byte) erro
 	}
 	_, err := e.writer.Write(bitWidths)
 	return err
+}
+
+func (e *BinaryPackedEncoder) errorf(msg string, err error) error {
+	return fmt.Errorf("DELTA_BINARY_PACKED: %s: %w", msg, err)
 }
 
 func blockToInt32x8(block []int32) [][8]int32 {
