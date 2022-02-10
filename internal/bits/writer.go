@@ -8,7 +8,7 @@ import (
 
 type Writer struct {
 	writer io.Writer
-	buffer [64]byte
+	buffer [512]byte
 }
 
 func (w *Writer) Reset(ww io.Writer) {
@@ -21,13 +21,15 @@ func (w *Writer) WriteInt8x8(data [][8]int8, bitWidth uint) error {
 	}
 	buf := &w.buffer
 
-	for i := range data {
-		*buf = [64]byte{}
-		writeInt8x8(buf, &data[i], bitWidth)
+	for i := 0; i < len(data); {
+		n := writeInt8x8(buf, data[i:len(data):len(data)], bitWidth)
+		k := uint(n) * bitWidth
 
-		if _, err := w.writer.Write(buf[:bitWidth]); err != nil {
+		if _, err := w.writer.Write(buf[:k]); err != nil {
 			return err
 		}
+
+		i += n
 	}
 
 	return nil
@@ -37,7 +39,7 @@ func (w *Writer) WriteInt16x8(data [][8]int16, bitWidth uint) error {
 	if bitWidth > 16 {
 		return fmt.Errorf("cannot write 16 bits values to %d bits", bitWidth)
 	}
-	buf := &w.buffer
+	buf := (*[64]byte)(w.buffer[:])
 
 	for i := range data {
 		*buf = [64]byte{}
@@ -55,7 +57,7 @@ func (w *Writer) WriteInt32x8(data [][8]int32, bitWidth uint) error {
 	if bitWidth > 32 {
 		return fmt.Errorf("cannot write 32 bits values to %d bits", bitWidth)
 	}
-	buf := &w.buffer
+	buf := (*[64]byte)(w.buffer[:])
 
 	for i := range data {
 		*buf = [64]byte{}
@@ -73,7 +75,7 @@ func (w *Writer) WriteInt64x8(data [][8]int64, bitWidth uint) error {
 	if bitWidth > 64 {
 		return fmt.Errorf("cannot write 64 bits values to %d bits", bitWidth)
 	}
-	buf := &w.buffer
+	buf := (*[64]byte)(w.buffer[:])
 
 	for i := range data {
 		*buf = [64]byte{}
@@ -87,17 +89,32 @@ func (w *Writer) WriteInt64x8(data [][8]int64, bitWidth uint) error {
 	return nil
 }
 
-func writeInt8x8(dst *[64]byte, src *[8]int8, bitWidth uint) {
+func writeInt8x8(dst *[512]byte, src [][8]int8, bitWidth uint) int {
 	m := uint64(1<<bitWidth) - 1
-	p := (*uint64)(unsafe.Pointer(dst))
-	*p = (uint64(src[0])&m)<<(0*bitWidth) |
-		(uint64(src[1])&m)<<(1*bitWidth) |
-		(uint64(src[2])&m)<<(2*bitWidth) |
-		(uint64(src[3])&m)<<(3*bitWidth) |
-		(uint64(src[4])&m)<<(4*bitWidth) |
-		(uint64(src[5])&m)<<(5*bitWidth) |
-		(uint64(src[6])&m)<<(6*bitWidth) |
-		(uint64(src[7])&m)<<(7*bitWidth)
+	n := 512 / bitWidth
+
+	if uint(len(src)) > n {
+		src = src[:n:n]
+	}
+
+	b := dst[:bitWidth*uint(len(src))]
+	for i := range b {
+		b[i] = 0
+	}
+
+	for i := range src {
+		p := (*uint64)(unsafe.Pointer(&b[uint(i)*bitWidth]))
+		*p |= (uint64(src[i][0])&m)<<(0*bitWidth) |
+			(uint64(src[i][1])&m)<<(1*bitWidth) |
+			(uint64(src[i][2])&m)<<(2*bitWidth) |
+			(uint64(src[i][3])&m)<<(3*bitWidth) |
+			(uint64(src[i][4])&m)<<(4*bitWidth) |
+			(uint64(src[i][5])&m)<<(5*bitWidth) |
+			(uint64(src[i][6])&m)<<(6*bitWidth) |
+			(uint64(src[i][7])&m)<<(7*bitWidth)
+	}
+
+	return len(src)
 }
 
 func writeInt16x8(dst *[64]byte, src *[8]int16, bitWidth uint) {
