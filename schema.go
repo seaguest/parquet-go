@@ -3,7 +3,6 @@ package parquet
 import (
 	"fmt"
 	"reflect"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -290,10 +289,11 @@ func structFieldsOf(t reflect.Type) []reflect.StructField {
 		}
 	}
 
-	sort.Slice(fields, func(i, j int) bool {
-		return fields[i].Name < fields[j].Name
-	})
-
+	// seaguest: keep fields in order
+	/*	sort.Slice(fields, func(i, j int) bool {
+			return fields[i].Name < fields[j].Name
+		})
+	*/
 	return fields
 }
 
@@ -360,13 +360,22 @@ func (s *structNode) ValueByIndex(base reflect.Value, index int) reflect.Value {
 }
 
 func (s *structNode) indexOf(name string) int {
-	i := sort.Search(len(s.names), func(i int) bool {
-		return s.names[i] >= name
-	})
-	if i == len(s.names) || s.names[i] != name {
-		i = -1
+	for i, n := range s.names {
+		if name == n {
+			return i
+		}
 	}
-	return i
+	return -1
+
+	// seaguest: keep fields in order
+	/*	i := sort.Search(len(s.names), func(i int) bool {
+			return s.names[i] >= name
+		})
+		if i == len(s.names) || s.names[i] != name {
+			i = -1
+		}
+		return i
+	*/
 }
 
 // fieldByIndex is like reflect.Value.FieldByIndex but returns the zero-value of
