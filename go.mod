@@ -1,6 +1,6 @@
-module github.com/segmentio/parquet-go
+module github.com/seaguest/parquet-go
 
-go 1.18
+go 1.17
 
 require (
 	github.com/andybalholm/brotli v1.0.3
@@ -9,5 +9,8 @@ require (
 	github.com/klauspost/compress v1.15.1
 	github.com/pierrec/lz4/v4 v4.1.9
 	github.com/segmentio/encoding v0.3.3
+	github.com/segmentio/parquet-go v0.0.0-00010101000000-000000000000
 	golang.org/x/sys v0.0.0-20211110154304-99a53858aa08
 )
+
+replace github.com/segmentio/parquet-go => ./
