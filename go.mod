@@ -11,5 +11,3 @@ require (
 	github.com/segmentio/encoding v0.3.3
 	golang.org/x/sys v0.0.0-20211110154304-99a53858aa08
 )
-
-replace github.com/segmentio/parquet-go => ./
